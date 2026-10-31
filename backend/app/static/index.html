@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Campus Memory — a traceable knowledge archive for campus course experiences.">
+  <meta name="color-scheme" content="light">
+  <title>校园集体记忆 AI 传承助手</title>
+  <link rel="stylesheet" href="/static/styles.css?v=login-editorial-20261029">
+</head>
+<body>
+  <div class="app-shell">
+    <aside id="app-sidebar" class="sidebar" aria-label="主导航">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 36 36" role="img" focusable="false">
+            <path d="M5.5 9.5c4.2-1.9 8.5-1.3 12.5 1.7v16.3c-4-2.6-8.2-3.1-12.5-1.3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M30.5 9.5c-4.2-1.9-8.5-1.3-12.5 1.7v16.3c4-2.6 8.2-3.1 12.5-1.3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M8.6 14.3c2.2-.6 4.4-.3 6.5.8M8.6 18.2c2.2-.6 4.4-.3 6.5.8M27.4 14.3c-2.2-.6-4.4-.3-6.5.8M27.4 18.2c-2.2-.6-4.4-.3-6.5.8" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round"/>
+            <path d="M18 11.2v16.3" fill="none" stroke="#FF5900" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <div class="brand-copy"><div class="brand-title">校园集体记忆</div><div class="brand-subtitle">AI 传承助手</div></div>
+      </div>
+      <div class="sidebar-label">工作空间</div>
+      <nav id="main-nav" class="nav-list">
+        <button class="nav-item active" data-view="overview" title="项目概览"><span class="nav-icon" aria-hidden="true">◈</span><span class="nav-label">项目概览</span></button>
+        <button class="nav-item" data-view="search" title="经验检索"><span class="nav-icon" aria-hidden="true">⌕</span><span class="nav-label">经验检索</span></button>
+        <button class="nav-item" data-view="qa" title="AI 问答"><span class="nav-icon" aria-hidden="true">✳</span><span class="nav-label">AI 问答</span></button>
+        <button class="nav-item" data-view="submit" title="提交经验"><span class="nav-icon" aria-hidden="true">＋</span><span class="nav-label">提交经验</span></button>
+        <button class="nav-item" data-view="mine" title="我的记录"><span class="nav-icon" aria-hidden="true">▤</span><span class="nav-label">我的记录</span></button>
+        <button class="nav-item" data-view="review" title="审核工作台"><span class="nav-icon" aria-hidden="true">✓</span><span class="nav-label">审核工作台</span><span id="review-count" class="nav-count">—</span></button>
+        <button class="nav-item" data-view="sources" title="来源管理"><span class="nav-icon" aria-hidden="true">↗</span><span class="nav-label">来源管理</span></button>
+        <button class="nav-item" data-view="scoring" title="可信度评分"><span class="nav-icon" aria-hidden="true">◎</span><span class="nav-label">可信度评分</span></button>
+        <button class="nav-item" data-view="feedback" title="反馈与纠错"><span class="nav-icon" aria-hidden="true">◇</span><span class="nav-label">反馈与纠错</span><span class="nav-p1">P1</span></button>
+        <button class="nav-item" data-view="admin" title="管理与交付"><span class="nav-icon" aria-hidden="true">⚙</span><span class="nav-label">管理与交付</span></button>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="privacy-icon" aria-hidden="true">
+          <svg viewBox="0 0 28 28" focusable="false"><path d="M3.8 7.7c3.3-1.4 6.6-1 10.2 1.2v13.2c-3.5-2-6.8-2.4-10.2-1zM24.2 7.7C20.9 6.3 17.6 6.7 14 8.9v13.2c3.5-2 6.8-2.4 10.2-1z" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"/><path d="M7 12.2l4 .4M7 15.4l4 .4M21 12.2l-4 .4M21 15.4l-4 .4" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M14 8.9v13.2" fill="none" stroke="#FF5900" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </div>
+        <div class="sidebar-foot-copy"><span class="sidebar-foot-kicker">SOURCE-LED KNOWLEDGE</span><strong>可信知识，从出处开始</strong><p>只使用已审核且许可有效的内容。</p></div>
+      </div>
+    </aside>
+    <button type="button" id="sidebar-backdrop" class="sidebar-backdrop" aria-label="关闭导航栏" tabindex="-1"></button>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div class="topbar-leading">
+          <button type="button" id="sidebar-toggle" class="sidebar-toggle" aria-label="收起导航栏" aria-controls="app-sidebar" aria-expanded="true" title="收起 / 展开导航栏">
+            <span></span><span></span><span></span>
+          </button>
+          <div class="breadcrumbs"><span>校园知识库</span><span class="crumb-sep">/</span><strong id="page-crumb">项目概览</strong></div>
+        </div>
+        <div class="topbar-actions">
+          <span id="mode-chip" class="mode-chip">本地演示</span>
+          <div id="user-indicator" class="user-indicator"><div class="avatar">访</div><div><strong>访客</strong><small>可浏览公开内容</small></div></div>
+          <button id="login-open" class="btn btn-primary btn-small">登录 / 切换角色</button>
+          <button id="logout-button" class="btn btn-ghost btn-small hidden">退出</button>
+        </div>
+      </header>
+      <div id="demo-banner" class="demo-banner"><span class="banner-mark">i</span><span><strong>演示环境：</strong>当前内容是合成演示数据，不代表真实校内调查或真实学生经验。</span><button id="dismiss-banner" aria-label="关闭提示">×</button></div>
+      <section id="page-content" class="page-content" aria-live="polite"></section>
+      <footer class="app-footer"><span>Campus Memory Archive · 原文保留 · 来源可追溯</span><span id="footer-version">原型 0.1.0 · 需求基线 V1.0</span></footer>
+    </main>
+  </div>
+
+  <dialog id="login-dialog" class="dialog-card login-dialog" aria-labelledby="login-title" aria-describedby="login-description">
+    <form id="login-form" method="dialog" class="login-layout">
+      <aside class="login-story" aria-label="Campus Memory introduction">
+        <div class="login-story-masthead">
+          <span class="login-story-mark" aria-hidden="true">
+            <svg viewBox="0 0 42 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6.5 9.5H16c3.1 0 5.2 1.7 5.2 4.5v19c0-2.8-2.1-4.5-5.2-4.5H6.5V9.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+              <path d="M35.5 9.5H26c-3.1 0-5.2 1.7-5.2 4.5v19c0-2.8 2.1-4.5 5.2-4.5h9.5V9.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+              <path d="M20.8 14v19" stroke="#FF5900" stroke-width="2.4" stroke-linecap="round"/>
+              <path d="M10.5 14.5h5.2M10.5 19h5.2M26.3 14.5h5.2M26.3 19h5.2" stroke="currentColor" stroke-opacity=".55" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="login-wordmark"><strong>CAMPUS MEMORY</strong><small>KNOWLEDGE ARCHIVE</small></span>
+        </div>
+
+        <div class="login-story-main">
+          <div class="login-story-kicker"><span></span> A CAMPUS KNOWLEDGE ARCHIVE</div>
+          <h2>让有价值的经验，<br><em>留在校园里。</em></h2>
+          <p>从一段课程体验，到下一届学生能找到、看懂并追溯的知识。</p>
+          <div class="login-story-flow" aria-label="知识传承流程">
+            <div><span>01</span><strong>收集</strong></div>
+            <i aria-hidden="true"></i>
+            <div><span>02</span><strong>核验</strong></div>
+            <i aria-hidden="true"></i>
+            <div><span>03</span><strong>传承</strong></div>
+          </div>
+        </div>
+
+        <div class="login-story-footer">
+          <span class="login-live-dot" aria-hidden="true"></span>
+          <span>本地演示环境</span>
+          <span class="login-story-code">ARCHIVE / 001</span>
+        </div>
+      </aside>
+
+      <section class="login-panel">
+        <button class="icon-close login-close" id="login-close" type="button" aria-label="关闭登录窗口">×</button>
+        <header class="login-panel-head">
+          <span class="eyebrow">DEMO ACCESS</span>
+          <h2 id="login-title">选择演示角色</h2>
+          <p id="login-description">使用不同身份，体验知识从贡献到传承的完整流程。</p>
+        </header>
+
+        <div class="login-field-stack">
+          <div class="login-field">
+            <label class="field-label" for="login-username">用户名 <span>USERNAME</span></label>
+            <input class="input login-input" id="login-username" name="username" autocomplete="username" required value="contributor_demo" spellcheck="false">
+          </div>
+          <div class="login-field">
+            <label class="field-label" for="login-password">密码 <span>PASSWORD</span></label>
+            <input class="input login-input" id="login-password" name="password" autocomplete="current-password" type="password" required value="demo123!">
+          </div>
+        </div>
+
+        <div class="login-role-heading"><span>快速选择角色</span><small>QUICK ACCESS</small></div>
+        <div class="quick-role-list login-role-list" role="group" aria-label="快速选择演示角色">
+          <button type="button" class="quick-role" data-user="reader_demo"><span class="quick-role-index">01</span><span class="quick-role-copy"><strong>查询者</strong><small>浏览公开经验与问答</small></span><span class="quick-role-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" class="quick-role" data-user="contributor_demo"><span class="quick-role-index">02</span><span class="quick-role-copy"><strong>贡献者</strong><small>提交并管理个人经验</small></span><span class="quick-role-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" class="quick-role" data-user="reviewer_demo"><span class="quick-role-index">03</span><span class="quick-role-copy"><strong>审核员</strong><small>审核、退回与下架</small></span><span class="quick-role-arrow" aria-hidden="true">↗</span></button>
+          <button type="button" class="quick-role" data-user="admin_demo"><span class="quick-role-index">04</span><span class="quick-role-copy"><strong>管理员</strong><small>管理来源与系统设置</small></span><span class="quick-role-arrow" aria-hidden="true">↗</span></button>
+        </div>
+
+        <div class="login-bottom">
+          <p class="small-note login-demo-note"><span aria-hidden="true">i</span><span>演示账号密码均为 <code>demo123!</code>。生产环境请更换默认凭据。</span></p>
+          <div id="login-error" class="form-error login-error" role="alert" aria-live="polite"></div>
+          <button class="btn btn-primary btn-full login-submit" type="submit"><span>进入工作空间</span><span aria-hidden="true">↗</span></button>
+          <p class="login-panel-foot">CONTINUE TO YOUR WORKSPACE <span>SECURE ACCESS</span></p>
+        </div>
+      </section>
+    </form>
+  </dialog>
+
+  <dialog id="detail-dialog" class="dialog-card wide-dialog"><div id="detail-content"></div></dialog>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="/static/motion.js?v=editorial-motion-5" defer></script>
+  <script src="/static/app.js?v=editorial-motion-5" defer></script>
+</body>
+</html>

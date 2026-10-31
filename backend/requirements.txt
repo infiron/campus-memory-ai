@@ -1,0 +1,7 @@
+# Direct dependencies pinned to the versions used by the passing test run.
+fastapi==0.128.2
+uvicorn[standard]==0.48.0
+SQLAlchemy==2.0.50
+pydantic==2.13.5
+httpx==0.28.1
+pytest==9.0.2

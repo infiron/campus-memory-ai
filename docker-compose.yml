@@ -1,0 +1,27 @@
+services:
+  campus-memory:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_SCHOOL_NAME: ${APP_SCHOOL_NAME:-示范学校（演示环境）}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
+      SECRET_KEY: ${SECRET_KEY:-local-compose-key-change-this-before-deploying}
+      DATABASE_URL: sqlite:////data/campus_memory.db
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_EMBEDDING_MODEL: ${AI_EMBEDDING_MODEL:-}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-20}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
