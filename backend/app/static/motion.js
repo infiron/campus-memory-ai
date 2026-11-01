@@ -219,3 +219,74 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
   else boot();
 })();
+
+
+/* CAMPUS_PAGE_MOTION_V2: consistent page entrance and scroll reset.
+   This addon is independent of the existing scroll-reveal implementation. */
+(() => {
+  "use strict";
+
+  const start = () => {
+    const page = document.getElementById("page-content");
+    if (!page || page.dataset.campusPageMotionV2 === "true") return;
+    page.dataset.campusPageMotionV2 = "true";
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let previousHeading = null;
+    let previousPage = null;
+    let pendingFrame = 0;
+
+    function resetScroll() {
+      const scroller = document.scrollingElement || document.documentElement;
+      const oldBehavior = scroller.style.scrollBehavior;
+      scroller.style.scrollBehavior = "auto";
+      window.scrollTo(0, 0);
+      scroller.scrollTop = 0;
+      scroller.style.scrollBehavior = oldBehavior;
+    }
+
+    // Clicking a navigation item starts a fresh page; do not inherit scroll.
+    // Capture phase runs before the existing application's click handler.
+    document.addEventListener("click", event => {
+      const element = event.target instanceof Element ? event.target : null;
+      const button = element && element.closest("#main-nav [data-view], [data-go]");
+      if (button && !button.disabled) resetScroll();
+    }, true);
+
+    function onPageRendered() {
+      const heading = page.querySelector(":scope > .page-heading");
+      if (!heading || heading === previousHeading) return;
+      previousHeading = heading;
+
+      const activeNav = document.querySelector("#main-nav .nav-item.active[data-view]");
+      const activePage = activeNav ? activeNav.dataset.view : "";
+      if (activePage !== previousPage) {
+        resetScroll();
+        previousPage = activePage;
+      }
+
+      // All pages animate when opened. No IntersectionObserver is required
+      // for page content to become visible.
+      page.classList.remove("campus-page-enter-v2");
+      if (!reducedMotion.matches) {
+        void page.offsetWidth; // restart the animation on repeated visits
+        page.classList.add("campus-page-enter-v2");
+      }
+    }
+
+    // Existing app.js replaces #page-content children on navigation.
+    // Observe direct-child replacements, not nested table/row updates.
+    const observer = new MutationObserver(records => {
+      if (!records.some(record => record.target === page && record.type === "childList")) return;
+      cancelAnimationFrame(pendingFrame);
+      pendingFrame = requestAnimationFrame(onPageRendered);
+    });
+    observer.observe(page, { childList: true });
+    onPageRendered();
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start, { once: true });
+  } else {
+    start();
+  }
+})();
