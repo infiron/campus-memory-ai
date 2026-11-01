@@ -1,7 +1,0 @@
-Campus Memory AI — Step 2 CodeArts Starter
-
-Purpose: prepare the current local prototype for a genuine CodeArts repository/agent workflow.
-Included: source code, tests, README, traceability and status documents, CodeArts instructions, first review prompt, work-log template, open-source release checklist.
-Excluded: .env files, local databases, .venv, Python caches, pytest caches, real credentials, and actual user data.
-
-This bundle does NOT claim CodeArts has been used, RDS/Redis/MaaS has been connected, or a cloud deployment has succeeded. These must be performed in the team's actual Huawei Cloud account and recorded.
