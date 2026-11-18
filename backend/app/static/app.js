@@ -323,10 +323,98 @@ function bindDraftEditor() {
   form.addEventListener("submit",async e=>{e.preventDefault();try{const data=await api(`/experiences/${state.draft.id}/confirm`,{method:"POST",body:{...readFields(),confirm:true}});state.draft=null;toast("已送审，未审核前不会公开。");await renderPage();}catch(err){toast(err.message,true);}});
 }
 
+
+function experienceProgress(exp) {
+  // The three main stages of a course experience.
+  const steps = ["保存草稿", "提交审核", "审核发布"];
+
+  // Map backend statuses to the correct progress stage.
+  const statusConfig = {
+    draft: {
+      index: 0,
+      type: "normal",
+      message: "草稿已保存，请核对整理结果并提交审核。"
+    },
+    pending_review: {
+      index: 1,
+      type: "normal",
+      message: "经验已提交，正在等待审核员处理。"
+    },
+    published: {
+      index: 2,
+      type: "normal",
+      message: "审核通过，经验已发布，可进入公开检索。"
+    },
+    returned: {
+      index: 1,
+      type: "stopped",
+      message: "审核员已退回，请查看原因并修改后重新提交。"
+    },
+    rejected: {
+      index: 1,
+      type: "stopped",
+      message: "审核未通过，请查看拒绝原因。"
+    },
+    withdrawn: {
+      index: 2,
+      type: "stopped",
+      message: "此经验已下架，不再参与公开检索和问答。"
+    }
+  };
+
+  const current = statusConfig[exp.status] || {
+    index: 0,
+    type: "stopped",
+    message: "当前状态尚未识别，请联系管理员。"
+  };
+
+  const stages = steps.map((label, index) => {
+    let stageState = "upcoming";
+
+    if (exp.status === "published") {
+      // Once published, all three stages are completed.
+      stageState = "complete";
+    } else if (index < current.index) {
+      // Earlier stages have already been completed.
+      stageState = "complete";
+    } else if (index === current.index) {
+      // The active stage or an exceptional status.
+      stageState = current.type === "stopped"
+        ? "alert"
+        : "current";
+    }
+
+    const symbol = stageState === "complete"
+      ? "✓"
+      : String(index + 1);
+
+    return `
+      <div class="experience-progress-stage is-${stageState}">
+        <span class="experience-progress-dot"
+              aria-hidden="true">${symbol}</span>
+        <span>${label}</span>
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <section class="experience-progress"
+             aria-label="经验审核进度">
+      <div class="experience-progress-steps">
+        ${stages}
+      </div>
+      <p class="experience-progress-note">
+        ${esc(current.message)}
+      </p>
+    </section>
+  `;
+}
+
+
 async function renderMine(host) {
   if (!roleHas("contributor")) {host.innerHTML=pageHeading("MY RECORDS","我的记录",titles.mine[1])+`<div class="card card-pad">${emptyState("需要贡献者权限","登录贡献者账号后才能查看个人记录。","▤")}<div class="form-footer"><button class="btn btn-primary" id="mine-login">登录为贡献者</button></div></div>`;$("mine-login").addEventListener("click",()=>openLogin("contributor_demo"));return;}
   const data=await api("/experiences/mine");
-  host.innerHTML=pageHeading("MY EXPERIENCE RECORDS","我的记录",titles.mine[1],`<button class="btn btn-primary" id="new-experience">＋ 新建经验</button>`)+`<div class="card"><div class="result-bar"><span>共 ${data.results.length} 条个人记录</span><span>原文与抽取字段分开保存</span></div>${data.results.length?`<div class="result-list">${data.results.map(exp=>`<article class="result-item"><div class="result-top"><div><h3 class="result-title">${esc(exp.course_name)} · ${esc(exp.term)}</h3><div class="result-meta"><span>#EXP-${exp.id}</span><span>更新于 ${prettyDate(exp.updated_at)}</span></div></div><div class="tag-line">${statusTag(exp.status)}${exp.demo_data?tag("演示记录","amber"):""}</div></div><p class="result-excerpt">${esc(exp.raw_text)}</p>${exp.review_reason?`<div class="notice warning" style="margin-top:10px">处理意见：${esc(exp.review_reason)}</div>`:""}<div class="result-actions">${["draft","returned"].includes(exp.status)?`<button class="btn btn-primary btn-inline" data-edit-exp="${exp.id}">继续编辑 / 重新送审</button>`:""}<button class="btn btn-ghost btn-inline" data-view-exp="${exp.id}">查看结构化字段</button></div><div id="exp-details-${exp.id}" class="hidden policy-callout" style="margin-top:12px">难点：${esc(exp.difficulty)}<br>作业：${esc(exp.assignments)}<br>考核：${esc(exp.assessment)}<br>建议：${esc(exp.advice)}</div></article>`).join("")}</div>`:emptyState("你还没有提交记录","从“提交经验”开始，先保存真实原文，再确认 AI 整理结果。","＋")}</div>`;
+  host.innerHTML=pageHeading("MY EXPERIENCE RECORDS","我的记录",titles.mine[1],`<button class="btn btn-primary" id="new-experience">＋ 新建经验</button>`)+`<div class="card"><div class="result-bar"><span>共 ${data.results.length} 条个人记录</span><span>原文与抽取字段分开保存</span></div>${data.results.length?`<div class="result-list">${data.results.map(exp=>`<article class="result-item"><div class="result-top"><div><h3 class="result-title">${esc(exp.course_name)} · ${esc(exp.term)}</h3><div class="result-meta"><span>#EXP-${exp.id}</span><span>更新于 ${prettyDate(exp.updated_at)}</span></div></div><div class="tag-line">${statusTag(exp.status)}${exp.demo_data?tag("演示记录","amber"):""}</div></div>${experienceProgress(exp)}<p class="result-excerpt">${esc(exp.raw_text)}</p>${exp.review_reason?`<div class="notice warning" style="margin-top:10px">处理意见：${esc(exp.review_reason)}</div>`:""}<div class="result-actions">${["draft","returned"].includes(exp.status)?`<button class="btn btn-primary btn-inline" data-edit-exp="${exp.id}">继续编辑 / 重新送审</button>`:""}<button class="btn btn-ghost btn-inline" data-view-exp="${exp.id}">查看结构化字段</button></div><div id="exp-details-${exp.id}" class="hidden policy-callout" style="margin-top:12px">难点：${esc(exp.difficulty)}<br>作业：${esc(exp.assignments)}<br>考核：${esc(exp.assessment)}<br>建议：${esc(exp.advice)}</div></article>`).join("")}</div>`:emptyState("你还没有提交记录","从“提交经验”开始，先保存真实原文，再确认 AI 整理结果。","＋")}</div>`;
   $("new-experience").addEventListener("click",()=>{state.draft=null;navigate("submit")});
   host.querySelectorAll("[data-view-exp]").forEach(b=>b.addEventListener("click",()=>{$(`exp-details-${b.dataset.viewExp}`).classList.toggle("hidden")}));
   host.querySelectorAll("[data-edit-exp]").forEach(b=>b.addEventListener("click",async()=>{try{state.draft=await api(`/experiences/${b.dataset.editExp}`);navigate("submit");}catch(e){toast(e.message,true);}}));
