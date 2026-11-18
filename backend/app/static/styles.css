@@ -1098,3 +1098,87 @@ dialog.login-dialog[open] { animation: login-dialog-enter .24s var(--ease) both;
     font-size: 11px;
   }
 }
+
+
+/* Simplified login modal */
+
+dialog.login-dialog.dialog-card {
+  width: min(480px, calc(100vw - 28px));
+  max-width: 480px;
+}
+
+.login-layout {
+  display: block;
+  min-height: 0;
+}
+
+.login-story,
+.login-panel-head .eyebrow,
+.login-panel-foot,
+.login-role-heading small,
+.quick-role-index,
+.quick-role-copy small,
+.quick-role-arrow,
+.login-field .field-label span {
+  display: none;
+}
+
+.login-panel {
+  padding: 34px 28px 28px;
+}
+
+.login-panel-head {
+  margin-bottom: 22px;
+}
+
+.login-panel-head h2 {
+  font-size: 27px;
+}
+
+.login-field-stack {
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.login-role-heading {
+  margin-top: 22px;
+  padding-bottom: 8px;
+}
+
+.login-role-list {
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.login-role-list .quick-role {
+  display: block;
+  padding: 12px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper-warm);
+}
+
+.login-role-list .quick-role:hover {
+  padding: 12px;
+  border-color: var(--orange);
+}
+
+.login-role-list .quick-role-copy {
+  align-items: center;
+}
+
+.login-bottom {
+  margin-top: 0;
+  padding-top: 18px;
+}
+
+.login-submit {
+  justify-content: center;
+}
+
+@media (max-width: 480px) {
+  .login-panel {
+    padding: 28px 20px 22px;
+  }
+}
