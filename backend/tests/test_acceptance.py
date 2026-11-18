@@ -299,6 +299,40 @@ def test_p1_feedback_has_id_and_review_does_not_directly_mutate_source(client, t
     assert any(item["id"] == feedback["feedback_id"] and item["status"] == "updated" for item in listed)
 
 
+def test_feature1_citation_report_prefill_flow_uses_existing_feedback_workflow(client, tokens):
+    """Feature 1: a citation returned by /api/qa can be reported with source ID + irrelevant_citation prefilled."""
+    contributor = tokens("contributor_demo")
+    reviewer = tokens("reviewer_demo")
+    linear = next(c for c in client.get("/api/courses").json() if c["name"] == "线性代数")
+    qa = client.post("/api/qa", json={"question": "线性代数期末应该怎么准备？", "course_id": linear["id"]})
+    assert qa.status_code == 200, qa.text
+    answer = qa.json()
+    assert answer["citations"], "演示数据应至少返回一条引用"
+    citation = answer["citations"][0]
+    # The frontend prefills exactly these values when the user clicks "报告引用问题".
+    submitted = client.post("/api/feedback", headers=contributor, json={
+        "target_type": "source", "target_id": citation["id"], "category": "irrelevant_citation",
+        "description": "测试：该引用与提问内容不相关。"
+    })
+    assert submitted.status_code == 200, submitted.text
+    feedback = submitted.json()
+    assert feedback["feedback_code"].startswith("FB-") and feedback["status"] == "pending"
+    # The reviewer can inspect the report with the prefilled target and problem type.
+    listed = client.get("/api/feedback", headers=reviewer).json()["results"]
+    item = next(x for x in listed if x["id"] == feedback["feedback_id"])
+    assert item["target_type"] == "source" and item["target_id"] == citation["id"]
+    assert item["category"] == "irrelevant_citation" and item["status"] == "pending"
+
+
+def test_feature1_frontend_wires_report_button_to_prefilled_feedback_form():
+    """Static guard: QA citations expose the report button and the feedback form consumes the prefill draft."""
+    from pathlib import Path
+    app_js = (Path(__file__).resolve().parents[1] / "app" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "报告引用问题" in app_js and "data-report-citation" in app_js
+    assert 'category: "irrelevant_citation"' in app_js and 'target_type: "source"' in app_js
+    assert "state.feedbackDraft" in app_js and "function reportCitationIssue" in app_js
+
+
 def test_p1_maintenance_only_suggests_candidates_and_p2_metrics_are_aggregated(client, tokens):
     admin = tokens("admin_demo")
     reader = tokens("reader_demo")
@@ -434,3 +468,24 @@ def test_empty_school_source_excluded_when_course_selected(client, tokens):
     assert all(cite["id"] != source_id for cite in qa.json().get("citations", [])), "school 为空的来源不应出现在本校课程AI问答证据中"
     credibility = client.get(f"/api/credibility?course_id={course['id']}").json()
     assert all(row.get("source_id") != source_id for row in credibility["results"]), "school 为空的来源不应出现在本校课程可信度候选中"
+
+
+
+def test_feature1_final_frontend_guards_and_reviewer_source_lookup():
+    """Static integration guard for the complete citation-report hand-off."""
+    from pathlib import Path
+
+    app_js = (Path(__file__).resolve().parents[1] / "app" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "报告引用问题" in app_js
+    assert "function reportCitationIssue(result, index)" in app_js
+    assert "Number.isSafeInteger(sourceId)" in app_js
+    assert 'category: "irrelevant_citation"' in app_js
+    assert 'target_type: "source"' in app_js
+    assert "FEEDBACK_CONTEXT_MARKER" in app_js
+    assert "function splitFeedbackDescription(description)" in app_js
+    assert "feedbackCategoryLabels[feedback.category]" in app_js
+    assert "feedbackTargetLabels[feedback.target_type]" in app_js
+    assert 'data-feedback-source="${source.id}"' in app_js
+    assert 'if (state.page === "feedback" && page !== "feedback") state.feedbackDraft = null;' in app_js
+    assert 'form.elements.target_id.readOnly = false;' in app_js
+    assert 'state.feedbackDraft = null;' in app_js
