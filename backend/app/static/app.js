@@ -1,6 +1,6 @@
 const API = "/api";
 const $ = (id) => document.getElementById(id);
-const state = { token: localStorage.getItem("campus_token") || "", user: null, page: "overview", courses: [], dashboard: null, draft: null, editing: false, dismissDemo: false, lastAnswer: null };
+const state = { token: localStorage.getItem("campus_token") || "", user: null, page: "overview", courses: [], dashboard: null, draft: null, editing: false, dismissDemo: false, lastAnswer: null, feedbackDraft: null };
 const titles = {
   overview: ["项目概览", "从课程经验入库到引用式问答，先跑通可验证的知识闭环。"],
   search: ["经验检索", "按课程、学期和关键词查找已发布且允许公开的经验与资料。"],
@@ -16,6 +16,9 @@ const titles = {
 const roleLabels = { reader: "查询者", contributor: "贡献者", reviewer: "审核员", admin: "管理员" };
 const statusLabels = { draft: "草稿", pending_review: "待审核", returned: "退回修改", rejected: "已拒绝", published: "已发布", withdrawn: "已下架", pending: "待确认", active: "有效", maintained: "维持原样", updated: "已更新", disputed: "标记争议", needs_more_evidence: "待补充证据" };
 const permissionLabels = { link_only: "仅可展示链接", abstract_allowed: "允许摘要用于生成", full_text_allowed: "允许全文用于生成", pending: "待确认", prohibited: "禁止使用" };
+const feedbackCategoryLabels = { outdated: "资料过时", incorrect: "内容错误", irrelevant_citation: "引用不相关", privacy: "隐私问题", other: "其他" };
+const feedbackTargetLabels = { experience: "课程经验", answer: "AI回答", source: "来源" };
+const FEEDBACK_CONTEXT_MARKER = "\n\n--- CAMPUS_CITATION_REPORT_CONTEXT_V1 ---\n";
 const linkStatusLabels = { unchecked: "链接待核验", verified: "链接已核验", invalid: "链接失效", demo_placeholder: "演示占位链接", not_applicable: "内部记录" };
 
 function esc(v) { return String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
@@ -183,7 +186,13 @@ function applyPageSectionSurfaces(host) {
   }
 }
 
-function navigate(page) { state.page = page; renderPage(); }
+function navigate(page) {
+  // A citation report is a one-time hand-off. Keep it while opening Feedback,
+  // but discard it if the user leaves Feedback without submitting or clearing it.
+  if (state.page === "feedback" && page !== "feedback") state.feedbackDraft = null;
+  state.page = page;
+  renderPage();
+}
 
 async function renderOverview(host) {
   const d = state.dashboard || { published_experiences: 0, pending_review: 0, active_sources: 0, courses: 0 };
@@ -275,12 +284,73 @@ async function renderQA(host) {
     try {
       const result = await api("/qa", {method:"POST", body:{question:q,course_id:course?Number(course):null,term:term||null}});
       state.lastAnswer = result;
-      const citationHTML = result.citations.length ? `<div class="subsection-title">引用来源（${result.citations.length}）</div>${result.citations.map((c,i)=>`<div class="citation-item"><div class="citation-title">[${i+1}] ${esc(c.title)} <span class="mono muted">${esc(c.source_code)}</span></div><div class="citation-meta"><span>${esc(sourceTypeLabel(c.source_type))}</span><span>${esc(c.course_name || "课程未注明")}</span><span>${esc(c.term || "学期未注明")}</span>${c.demo_data?`<span>${tag("演示数据","amber")}</span>`:""}</div><div style="margin-top:7px">${scorePill(c.score,c.grade)} ${c.most_credible?tag("最可信参考","green"):""}</div>${c.scope_note?`<p class="small muted">${esc(c.scope_note)}</p>`:""}<button class="btn btn-ghost btn-inline" data-cite-detail="${c.id}" style="margin-top:8px">展开评分依据</button></div>`).join("")}` : `<div class="notice warning" style="margin-top:13px">未找到足够的可用证据。系统没有生成无来源结论。</div>`;
+      const citationHTML = result.citations.length ? `<div class="subsection-title">引用来源（${result.citations.length}）</div>${result.citations.map((c,i)=>`<div class="citation-item"><div class="citation-title">[${i+1}] ${esc(c.title)} <span class="mono muted">${esc(c.source_code)}</span></div><div class="citation-meta"><span>${esc(sourceTypeLabel(c.source_type))}</span><span>${esc(c.course_name || "课程未注明")}</span><span>${esc(c.term || "学期未注明")}</span>${c.demo_data?`<span>${tag("演示数据","amber")}</span>`:""}</div><div style="margin-top:7px">${scorePill(c.score,c.grade)} ${c.most_credible?tag("最可信参考","green"):""}</div>${c.scope_note?`<p class="small muted">${esc(c.scope_note)}</p>`:""}<div class="citation-actions" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px"><button class="btn btn-ghost btn-inline" data-cite-detail="${c.id}">展开评分依据</button><button type="button" class="btn btn-ghost btn-inline" data-report-citation="${i}" title="将此引用作为纠错反馈提交，来源 ID 与问题类型会自动填入">⚑ 报告引用问题</button></div></div>`).join("")}` : `<div class="notice warning" style="margin-top:13px">未找到足够的可用证据。系统没有生成无来源结论。</div>`;
       $("qa-result").innerHTML = `<div class="tag-line">${result.sufficiency === "supported"?tag("存在多条可用证据","green"):result.sufficiency === "limited"?tag("样本有限","amber"):result.sufficiency === "conflict"?tag("存在冲突","red"):tag("证据不足","gray")}${tag(result.model_mode === "configured-model"?"已配置模型":"证据模板模式", "blue")}</div><div class="qa-answer">${esc(result.answer)}</div><div class="notice" style="margin-top:12px"><span class="notice-icon">i</span><div>${esc(result.notice)} ${esc(result.demo_warning || "")}</div></div>${citationHTML}`;
       $("qa-result").querySelectorAll("[data-cite-detail]").forEach(b=>b.addEventListener("click",async()=>{try{const c=await api(`/sources/${b.dataset.citeDetail}`);showSourceDetail(c);}catch(e){toast(e.message,true);}}));
+      $("qa-result").querySelectorAll("[data-report-citation]").forEach(b=>b.addEventListener("click",()=>reportCitationIssue(result,Number(b.dataset.reportCitation))));
     } catch(err) { $("qa-result").innerHTML = `<div class="notice danger">${esc(err.message)}</div>`; }
     finally { btn.disabled = false; btn.textContent = "检索证据并回答　→"; }
   });
+}
+
+// Feature 1: report a problem with one citation of an AI answer.
+// Reuses POST /api/feedback; no new endpoint or database migration is required.
+function reportCitationIssue(result, index) {
+  const citation = result && Array.isArray(result.citations) ? result.citations[index] : null;
+  const sourceId = citation ? Number(citation.id) : NaN;
+  if (!citation || !Number.isSafeInteger(sourceId) || sourceId <= 0) {
+    toast("无法读取该引用的有效来源编号，请重新提问后再试。", true);
+    return;
+  }
+  state.feedbackDraft = {
+    target_type: "source",
+    target_id: sourceId,
+    category: "irrelevant_citation",
+    source_code: citation.source_code || "",
+    source_title: citation.title || "",
+    citation_no: index + 1,
+    question: result.question || "",
+    answer_id: result.answer_id != null && Number.isSafeInteger(Number(result.answer_id)) && Number(result.answer_id) > 0 ? Number(result.answer_id) : null
+  };
+  navigate("feedback");
+}
+
+function citationFeedbackContext(draft) {
+  return [
+    `引用序号：[${draft.citation_no}]`,
+    `来源编号：${draft.source_code || "未提供"}`,
+    `来源标题：${draft.source_title || "未提供"}`,
+    `来源 ID：${draft.target_id}`,
+    `AI 回答 ID：${draft.answer_id == null ? "未返回" : draft.answer_id}`,
+    `原始问题：${draft.question || "未记录"}`
+  ].join("\n");
+}
+
+function feedbackDescriptionLimit(draft) {
+  if (!draft) return 3000;
+  // FeedbackCreate.description is capped at 3000 characters by the existing API.
+  const reserved = FEEDBACK_CONTEXT_MARKER.length + citationFeedbackContext(draft).length;
+  return Math.max(5, 3000 - reserved);
+}
+
+function buildFeedbackDescription(userDescription, draft) {
+  const cleanDescription = String(userDescription || "").trim();
+  if (!draft) return cleanDescription;
+  return `${cleanDescription}${FEEDBACK_CONTEXT_MARKER}${citationFeedbackContext(draft)}`;
+}
+
+function splitFeedbackDescription(description) {
+  const text = String(description || "");
+  const markerIndex = text.lastIndexOf(FEEDBACK_CONTEXT_MARKER);
+  if (markerIndex < 0) return { userDescription: text, citationContext: "" };
+  return {
+    userDescription: text.slice(0, markerIndex).trim(),
+    citationContext: text.slice(markerIndex + FEEDBACK_CONTEXT_MARKER.length).trim()
+  };
+}
+
+function feedbackPrefillNotice(draft) {
+  return `<div class="notice" id="feedback-prefill-notice" style="margin-bottom:14px"><span class="notice-icon">⚑</span><div><strong>已从 AI 问答带入引用 [${esc(draft.citation_no)}]</strong><br>来源：${esc(draft.source_code || "—")} · ${esc(draft.source_title || "未命名来源")}（来源 ID ${esc(draft.target_id)}）<br>原始问题：${esc(draft.question || "未记录")}<br>目标来源和问题类型「引用不相关」已锁定；提交后会将引用上下文一并提供给审核员。<div style="margin-top:8px"><button type="button" class="btn btn-ghost btn-inline" id="feedback-prefill-clear">清除预填，改为普通反馈</button></div></div></div>`;
 }
 
 function experienceEditor(exp) {
@@ -454,13 +524,133 @@ async function renderScoring(host) {
 }
 
 async function renderFeedback(host) {
-  if (!state.user) {host.innerHTML=pageHeading("FEEDBACK LOOP","反馈与纠错",titles.feedback[1])+`<div class="card card-pad">${emptyState("请登录后提交反馈","P1反馈功能需要可识别账号；反馈经审核后才可处理知识库。","◇")}<div class="form-footer"><button class="btn btn-primary" id="feedback-login">登录</button></div></div>`;$("feedback-login").addEventListener("click",()=>openLogin("reader_demo"));return;}
-  const data=await api("/feedback");
-  host.innerHTML=pageHeading("FEEDBACK LOOP","反馈与纠错",titles.feedback[1])+`<div class="grid grid-2"><div class="card card-pad"><div class="section-title-row"><h2>提交纠错反馈</h2>${tag("P1", "amber")}</div><form id="feedback-form"><div class="form-grid"><div class="field"><label class="field-label">目标类型</label><select class="select" name="target_type"><option value="experience">课程经验</option><option value="answer">AI回答</option><option value="source">外部来源</option></select></div><div class="field"><label class="field-label">目标 ID</label><input class="input" name="target_id" type="number" min="1" required></div><div class="field span-2"><label class="field-label">问题类型</label><select class="select" name="category"><option value="outdated">资料过时</option><option value="incorrect">内容错误</option><option value="irrelevant_citation">引用不相关</option><option value="privacy">隐私问题</option><option value="other">其他</option></select></div><div class="field span-2"><label class="field-label">描述</label><textarea class="textarea" name="description" required minlength="5" placeholder="说明哪里过时/错误、适用范围，以及可供审核的理由或出处。"></textarea></div></div><div class="form-footer"><button class="btn btn-primary" type="submit">提交反馈</button></div></form><div class="policy-callout" style="margin-top:13px">反馈会生成 ID 与状态。未经审核的反馈不会直接修改内容；处理结果将留痕。</div></div><div class="card"><div class="card-header"><div><h2 class="card-title">${roleHas("reviewer","admin")?"待处理反馈":"我的反馈"}</h2><div class="card-subtitle">${data.results.length} 条记录</div></div></div><div class="result-list">${data.results.length?data.results.map(f=>`<article class="result-item"><div class="result-top"><div><h3 class="result-title">${esc(f.feedback_code)} · ${esc(f.category)}</h3><div class="result-meta">${esc(f.target_type)} #${f.target_id} · ${prettyDate(f.created_at)}</div></div>${statusTag(f.status)}</div><p class="result-excerpt">${esc(f.description)}</p>${f.handling_note?`<div class="policy-callout" style="margin-top:8px">处理意见：${esc(f.handling_note)}</div>`:""}${roleHas("reviewer","admin")&&f.status==="pending"?`<div class="result-actions"><select class="select" data-feedback-state="${f.id}" style="max-width:180px"><option value="maintained">维持原样</option><option value="updated">已更新</option><option value="disputed">标记争议</option><option value="withdrawn">下架</option><option value="needs_more_evidence">待补证</option></select><input class="input" data-feedback-note="${f.id}" placeholder="处理理由（必填）" style="max-width:240px"><button class="btn btn-primary btn-inline" data-handle-feedback="${f.id}">处理</button></div>`:""}</article>`).join(""):emptyState("暂无反馈记录","有过时或引用不匹配的资料时，可在此提交给审核人员。","◇")}</div></div></div>`;
-  $("feedback-form").addEventListener("submit",async e=>{e.preventDefault();const form=e.currentTarget;const fd=new FormData(form);const body=Object.fromEntries(fd.entries());body.target_id=Number(body.target_id);try{const result=await api("/feedback",{method:"POST",body});toast(`反馈已记录：${result.feedback_code}`);await renderFeedback(host);}catch(err){toast(err.message,true);}});
-  host.querySelectorAll("[data-handle-feedback]").forEach(b=>b.addEventListener("click",async()=>{const id=b.dataset.handleFeedback,st=host.querySelector(`[data-feedback-state="${id}"]`).value,note=host.querySelector(`[data-feedback-note="${id}"]`).value.trim();if(!note){toast("请填写处理理由。",true);return;}try{await api(`/feedback/${id}`,{method:"PATCH",body:{status:st,handling_note:note}});toast("反馈处理已记录。");await renderFeedback(host);}catch(e){toast(e.message,true);}}));
-}
+  if (!state.user) {
+    const pendingReport = state.feedbackDraft;
+    host.innerHTML = pageHeading("FEEDBACK LOOP", "反馈与纠错", titles.feedback[1]) +
+      `<div class="card card-pad">${pendingReport ? `<div class="notice" style="margin-bottom:14px"><span class="notice-icon">⚑</span><div>你正在报告引用 [${esc(pendingReport.citation_no)}]（${esc(pendingReport.source_code || `来源 #${pendingReport.target_id}`)}）的问题。登录后会自动带入来源信息和问题类型。</div></div>` : ""}` +
+      `${emptyState("请登录后提交反馈", "反馈提交需要可识别账号；反馈经审核后才可处理知识库。", "◇")}<div class="form-footer"><button class="btn btn-primary" id="feedback-login">登录</button></div></div>`;
+    $("feedback-login").addEventListener("click", () => openLogin("reader_demo"));
+    return;
+  }
 
+  const data = await api("/feedback");
+  const draft = state.feedbackDraft;
+  let activeDraft = draft;
+  const isReviewer = roleHas("reviewer", "admin");
+  let sourceById = new Map();
+
+  // Reviewer/admin may inspect the full source registry, including withdrawn or
+  // invalid records. Ordinary users never receive this additional data.
+  if (isReviewer) {
+    try {
+      const sourceData = await api("/sources");
+      sourceById = new Map((sourceData.results || []).map(source => [String(source.id), source]));
+    } catch (_) {
+      // Keep the feedback queue usable even if the supplementary source lookup fails.
+    }
+  }
+
+  const prefillTarget = draft ? draft.target_type : "";
+  const prefillCategory = draft ? draft.category : "";
+  const descriptionLimit = feedbackDescriptionLimit(draft);
+
+  const feedbackRows = data.results.length ? data.results.map(feedback => {
+    const descriptionParts = splitFeedbackDescription(feedback.description);
+    const source = feedback.target_type === "source" ? sourceById.get(String(feedback.target_id)) : null;
+    const sourceSummary = isReviewer && feedback.target_type === "source"
+      ? (source
+        ? `<div class="policy-callout" style="margin-top:9px"><strong>关联来源：</strong>${esc(source.source_code || `来源 #${source.id}`)} · ${esc(source.title || "未命名来源")}<br><span class="small muted">${esc(source.school || "学校未注明")} · ${esc(source.course_name || "课程未指定")} · ${esc(statusLabels[source.status] || source.status || "状态未知")} · ${esc(permissionLabels[source.permission] || source.permission || "权限未知")}</span><div style="margin-top:8px"><button type="button" class="btn btn-ghost btn-inline" data-feedback-source="${source.id}">查看关联来源详情</button></div></div>`
+        : `<div class="policy-callout" style="margin-top:9px">关联来源：#${esc(feedback.target_id)}。来源记录当前无法从来源登记表读取，请结合反馈编号进一步核查。</div>`)
+      : "";
+
+    const contextBlock = descriptionParts.citationContext
+      ? `<div class="policy-callout" style="margin-top:9px;white-space:pre-wrap"><strong>AI 引用关联上下文（系统附加）</strong><br>${esc(descriptionParts.citationContext)}</div>`
+      : "";
+
+    return `<article class="result-item"><div class="result-top"><div><h3 class="result-title">${esc(feedback.feedback_code)} · ${esc(feedbackCategoryLabels[feedback.category] || feedback.category)}</h3><div class="result-meta">${esc(feedbackTargetLabels[feedback.target_type] || feedback.target_type)} #${esc(feedback.target_id)} · ${prettyDate(feedback.created_at)}</div></div>${statusTag(feedback.status)}</div><p class="result-excerpt">${esc(descriptionParts.userDescription)}</p>${contextBlock}${sourceSummary}${feedback.handling_note ? `<div class="policy-callout" style="margin-top:8px">处理意见：${esc(feedback.handling_note)}</div>` : ""}${isReviewer && feedback.status === "pending" ? `<div class="result-actions"><select class="select" data-feedback-state="${feedback.id}" style="max-width:180px"><option value="maintained">维持原样</option><option value="updated">已更新</option><option value="disputed">标记争议</option><option value="withdrawn">下架</option><option value="needs_more_evidence">待补证</option></select><input class="input" data-feedback-note="${feedback.id}" placeholder="处理理由（必填）" style="max-width:240px"><button class="btn btn-primary btn-inline" data-handle-feedback="${feedback.id}">处理</button></div>` : ""}</article>`;
+  }).join("") : emptyState("暂无反馈记录", "有过时或引用不匹配的资料时，可在此提交给审核人员。", "◇");
+
+  host.innerHTML = pageHeading("FEEDBACK LOOP", "反馈与纠错", titles.feedback[1]) +
+    `<div class="grid grid-2"><div class="card card-pad"><div class="section-title-row"><h2>${draft ? "报告 AI 引用问题" : "提交纠错反馈"}</h2>${tag("P1", "amber")}</div>${draft ? feedbackPrefillNotice(draft) : ""}<form id="feedback-form"><div class="form-grid"><div class="field"><label class="field-label">目标类型</label><select class="select" name="target_type" ${draft ? "disabled" : ""}><option value="experience" ${(!draft || prefillTarget === "experience") ? "selected" : ""}>课程经验</option><option value="answer" ${prefillTarget === "answer" ? "selected" : ""}>AI回答</option><option value="source" ${prefillTarget === "source" ? "selected" : ""}>外部来源</option></select>${draft ? `<input type="hidden" name="target_type" value="${esc(draft.target_type)}" data-prefill-hidden>` : ""}</div><div class="field"><label class="field-label">目标 ID</label><input class="input" name="target_id" type="number" min="1" required value="${draft ? esc(draft.target_id) : ""}" ${draft ? "readonly" : ""}></div><div class="field span-2"><label class="field-label">问题类型</label><select class="select" name="category" ${draft ? "disabled" : ""}><option value="outdated" ${(!draft || prefillCategory === "outdated") ? "selected" : ""}>资料过时</option><option value="incorrect" ${prefillCategory === "incorrect" ? "selected" : ""}>内容错误</option><option value="irrelevant_citation" ${prefillCategory === "irrelevant_citation" ? "selected" : ""}>引用不相关</option><option value="privacy" ${prefillCategory === "privacy" ? "selected" : ""}>隐私问题</option><option value="other" ${prefillCategory === "other" ? "selected" : ""}>其他</option></select>${draft ? `<input type="hidden" name="category" value="${esc(draft.category)}" data-prefill-hidden>` : ""}</div><div class="field span-2"><label class="field-label">描述</label><textarea class="textarea" name="description" required minlength="5" maxlength="${descriptionLimit}" placeholder="${draft ? "请说明该引用为何与问题不相关（至少5个字），审核员会据此核查。" : "说明哪里过时/错误、适用范围，以及可供审核的理由或出处。"}"></textarea>${draft ? `<div class="small muted" style="margin-top:5px">为保留原始问题和引用信息，补充说明最多可输入 ${descriptionLimit} 个字符。</div>` : ""}</div></div><div class="form-footer"><button class="btn btn-primary" type="submit">提交反馈</button></div></form><div class="policy-callout" style="margin-top:13px">反馈会生成 ID 与状态。未经审核的反馈不会直接修改内容；处理结果将留痕。</div></div><div class="card"><div class="card-header"><div><h2 class="card-title">${isReviewer ? "待处理反馈" : "我的反馈"}</h2><div class="card-subtitle">${data.results.length} 条记录</div></div></div><div class="result-list">${feedbackRows}</div></div></div>`;
+
+  const clearPrefill = $("feedback-prefill-clear");
+  if (clearPrefill) {
+    clearPrefill.addEventListener("click", () => {
+      state.feedbackDraft = null;
+      activeDraft = null;
+      const form = $("feedback-form");
+      form.querySelectorAll("[data-prefill-hidden]").forEach(input => input.remove());
+      form.elements.target_type.disabled = false;
+      form.elements.target_type.value = "experience";
+      form.elements.target_id.readOnly = false;
+      form.elements.target_id.value = "";
+      form.elements.category.disabled = false;
+      form.elements.category.value = "outdated";
+      form.elements.description.maxLength = 3000;
+      form.elements.description.placeholder = "说明哪里过时/错误、适用范围，以及可供审核的理由或出处。";
+      $("feedback-prefill-notice")?.remove();
+      const heading = form.closest(".card")?.querySelector("h2");
+      if (heading) heading.textContent = "提交纠错反馈";
+    });
+  }
+
+  if (draft) {
+    const description = $("feedback-form").elements.description;
+    if (description) description.focus();
+  }
+
+  $("feedback-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const body = Object.fromEntries(formData.entries());
+    const userDescription = String(body.description || "").trim();
+    if (userDescription.length < 5) {
+      toast("请至少填写5个字的反馈说明。", true);
+      return;
+    }
+    body.target_id = Number(body.target_id);
+    body.description = buildFeedbackDescription(userDescription, activeDraft);
+    if (!Number.isSafeInteger(body.target_id) || body.target_id <= 0) {
+      toast("目标 ID 必须是有效的正整数。", true);
+      return;
+    }
+    const submitButton = form.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    try {
+      const result = await api("/feedback", { method: "POST", body });
+      state.feedbackDraft = null;
+      toast(`反馈已记录：${result.feedback_code}`);
+      await renderFeedback(host);
+    } catch (error) {
+      toast(error.message, true);
+    } finally {
+      submitButton.disabled = false;
+    }
+  });
+
+  host.querySelectorAll("[data-feedback-source]").forEach(button => {
+    button.addEventListener("click", () => {
+      const source = sourceById.get(String(button.dataset.feedbackSource));
+      if (source) showSourceDetail(source);
+      else toast("无法读取关联来源详情，请刷新反馈列表后重试。", true);
+    });
+  });
+
+  host.querySelectorAll("[data-handle-feedback]").forEach(button => button.addEventListener("click", async () => {
+    const id = button.dataset.handleFeedback;
+    const status = host.querySelector(`[data-feedback-state="${id}"]`).value;
+    const note = host.querySelector(`[data-feedback-note="${id}"]`).value.trim();
+    if (!note) { toast("请填写处理理由。", true); return; }
+    try {
+      await api(`/feedback/${id}`, { method: "PATCH", body: { status, handling_note: note } });
+      toast("反馈处理已记录。");
+      await renderFeedback(host);
+    } catch (error) {
+      toast(error.message, true);
+    }
+  }));
+}
 async function renderAdmin(host) {
   if (!roleHas("admin")) {host.innerHTML=pageHeading("ADMIN & DELIVERY","管理与交付",titles.admin[1])+`<div class="card card-pad">${emptyState("管理员权限受限","角色维护、规则变更和完整操作日志仅管理员可访问。","⚙")}<div class="form-footer"><button class="btn btn-primary" id="admin-login">登录管理员</button></div></div>`;$("admin-login").addEventListener("click",()=>openLogin("admin_demo"));return;}
   const [users, config, metrics] = await Promise.all([api("/admin/users"),api("/admin/scoring-config"),api("/admin/metrics")]);
@@ -484,7 +674,7 @@ async function tryRestoreUser() {
 // Global event wiring
 $("main-nav").addEventListener("click", e => { const btn = e.target.closest("[data-view]"); if (btn) navigate(btn.dataset.view); });
 $("login-open").addEventListener("click",()=>openLogin());
-$("logout-button").addEventListener("click",()=>{setUser(null,"");state.draft=null;toast("已退出登录。");renderPage();});
+$("logout-button").addEventListener("click",()=>{setUser(null,"");state.draft=null;state.feedbackDraft=null;toast("已退出登录。");renderPage();});
 $("login-close").addEventListener("click",()=>$("login-dialog").close());
 document.querySelectorAll("[data-user]").forEach(btn=>btn.addEventListener("click",()=>{$("login-username").value=btn.dataset.user;$("login-password").value="demo123!";}));
 $("login-form").addEventListener("submit",async e=>{e.preventDefault();try{const result=await api("/auth/login",{method:"POST",body:{username:$("login-username").value.trim(),password:$("login-password").value}});setUser(result.user,result.access_token);$("login-dialog").close();toast(`欢迎，${result.user.display_name}。`);await renderPage();}catch(err){$("login-error").textContent=err.message;}});
