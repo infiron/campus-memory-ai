@@ -1025,3 +1025,76 @@ dialog.login-dialog[open] { animation: login-dialog-enter .24s var(--ease) both;
 @media (prefers-reduced-motion: reduce) {
   #page-content.campus-page-enter-v2 > * { animation: none !important; }
 }
+
+
+/* Experience Submission Progress Tracker */
+
+.experience-progress {
+  margin: 14px 0;
+  padding: 16px;
+  background: var(--paper-warm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.experience-progress-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.experience-progress-stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.experience-progress-dot {
+  display: grid;
+  place-items: center;
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.is-complete .experience-progress-dot {
+  background: var(--green);
+  color: white;
+  border-color: var(--green);
+}
+
+.is-current .experience-progress-dot {
+  background: var(--orange);
+  color: white;
+  border-color: var(--orange);
+}
+
+.is-alert .experience-progress-dot {
+  background: var(--red-soft);
+  color: var(--red);
+  border-color: var(--red);
+}
+
+.experience-progress-note {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+@media (max-width: 520px) {
+  .experience-progress-stage {
+    flex-direction: column;
+    text-align: center;
+    font-size: 11px;
+  }
+}
