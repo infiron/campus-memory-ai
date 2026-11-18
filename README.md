@@ -18,7 +18,7 @@
 ### Windows PowerShell
 
 ```powershell
-cd campus_memory_ai\backend
+cd campus-memory-ai\backend
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
