@@ -326,7 +326,7 @@ function bindDraftEditor() {
 
 function experienceProgress(exp) {
   // The three main stages of a course experience.
-  const steps = ["保存草稿", "等待审核", "审核发布"];
+  const steps = ["保存草稿", "提交审核", "审核发布"];
 
   // Map backend statuses to the correct progress stage.
   const statusConfig = {
@@ -371,9 +371,14 @@ function experienceProgress(exp) {
   const stages = steps.map((label, index) => {
     let stageState = "upcoming";
 
-    if (index < current.index) {
+    if (exp.status === "published") {
+      // Once published, all three stages are completed.
+      stageState = "complete";
+    } else if (index < current.index) {
+      // Earlier stages have already been completed.
       stageState = "complete";
     } else if (index === current.index) {
+      // The active stage or an exceptional status.
       stageState = current.type === "stopped"
         ? "alert"
         : "current";
